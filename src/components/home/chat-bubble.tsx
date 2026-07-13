@@ -3,11 +3,11 @@ import { IMessage, useConversationStore } from "@/store/chat-store";
 import ChatBubbleAvatar from "./chat-bubble-avatar";
 import DateIndicator from "./date-indicator";
 import Image from "next/image";
-import { useState } from "react";
+import { useState, useRef, useEffect } from "react";
 import { Dialog, DialogContent, DialogDescription, DialogTitle } from "../ui/dialog";
 import ReactPlayer from "react-player";
 import ChatAvatarActions from "./chat-avatar-actions";
-import { Bot, Video } from "lucide-react";
+import { Bot, Video, Play, Pause, Mic } from "lucide-react";
 
 type ChatBubbleProps = {
 	message: IMessage;
@@ -39,6 +39,8 @@ const ChatBubble = ({ me, message, previousMessage }: ChatBubbleProps) => {
 				return <ImageMessage message={message} handleClick={() => setOpen(true)} />;
 			case "video":
 				return <VideoMessage message={message} />;
+			case "audio":
+				return <AudioMessage message={message} />;
 			default:
 				return null;
 		}
@@ -175,6 +177,126 @@ const TextMessage = ({ message }: { message: IMessage }) => {
 			) : (
 				<p className={`mr-2 text-sm font-light`}>{message.content}</p>
 			)}
+		</div>
+	);
+};
+
+const AudioMessage = ({ message }: { message: IMessage }) => {
+	const audioRef = useRef<HTMLAudioElement>(null);
+	const [isPlaying, setIsPlaying] = useState(false);
+	const [currentTime, setCurrentTime] = useState(0);
+	const [duration, setDuration] = useState(0);
+	const [playbackRate, setPlaybackRate] = useState(1);
+
+	useEffect(() => {
+		const audio = audioRef.current;
+		if (!audio) return;
+
+		const handleTimeUpdate = () => {
+			setCurrentTime(audio.currentTime);
+		};
+
+		const handleLoadedMetadata = () => {
+			setDuration(audio.duration);
+		};
+
+		const handleEnded = () => {
+			setIsPlaying(false);
+			setCurrentTime(0);
+		};
+
+		audio.addEventListener("timeupdate", handleTimeUpdate);
+		audio.addEventListener("loadedmetadata", handleLoadedMetadata);
+		audio.addEventListener("ended", handleEnded);
+
+		// If duration is already loaded
+		if (audio.duration) {
+			setDuration(audio.duration);
+		}
+
+		return () => {
+			audio.removeEventListener("timeupdate", handleTimeUpdate);
+			audio.removeEventListener("loadedmetadata", handleLoadedMetadata);
+			audio.removeEventListener("ended", handleEnded);
+		};
+	}, []);
+
+	const togglePlayPause = () => {
+		const audio = audioRef.current;
+		if (!audio) return;
+
+		if (isPlaying) {
+			audio.pause();
+			setIsPlaying(false);
+		} else {
+			audio.play().catch((err) => console.error("Playback failed:", err));
+			setIsPlaying(true);
+		}
+	};
+
+	const handleSeek = (e: React.ChangeEvent<HTMLInputElement>) => {
+		const audio = audioRef.current;
+		if (!audio) return;
+		const newTime = parseFloat(e.target.value);
+		audio.currentTime = newTime;
+		setCurrentTime(newTime);
+	};
+
+	const togglePlaybackRate = () => {
+		const audio = audioRef.current;
+		if (!audio) return;
+		let newRate = 1;
+		if (playbackRate === 1) newRate = 1.5;
+		else if (playbackRate === 1.5) newRate = 2;
+		else newRate = 1;
+
+		audio.playbackRate = newRate;
+		setPlaybackRate(newRate);
+	};
+
+	const formatTime = (time: number) => {
+		if (isNaN(time)) return "0:00";
+		const minutes = Math.floor(time / 60);
+		const seconds = Math.floor(time % 60);
+		return `${minutes}:${seconds.toString().padStart(2, "0")}`;
+	};
+
+	return (
+		<div className='flex items-center gap-3 p-1.5 rounded-md bg-transparent max-w-[280px] w-[280px]'>
+			<audio ref={audioRef} src={message.content} preload='metadata' />
+			
+			<button 
+				onClick={togglePlayPause} 
+				className='flex items-center justify-center w-9 h-9 rounded-full bg-green-primary hover:bg-green-secondary text-white transition shadow-sm shrink-0'
+			>
+				{isPlaying ? <Pause size={16} fill='currentColor' /> : <Play size={16} className='ml-0.5' fill='currentColor' />}
+			</button>
+
+			<div className='flex flex-col flex-1 min-w-0'>
+				<input
+					type='range'
+					min={0}
+					max={duration || 100}
+					value={currentTime}
+					onChange={handleSeek}
+					className='w-full h-1 bg-gray-300 dark:bg-gray-600 rounded-lg appearance-none cursor-pointer accent-green-primary'
+				/>
+				
+				<div className='flex justify-between items-center mt-1 text-[10px] text-gray-500 dark:text-gray-400'>
+					<span>{formatTime(currentTime)}</span>
+					<span>{formatTime(duration)}</span>
+				</div>
+			</div>
+
+			<div className='flex flex-col items-center gap-1 shrink-0'>
+				<button 
+					onClick={togglePlaybackRate} 
+					className='text-[9px] font-bold px-1 py-0.5 rounded bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-300 dark:hover:bg-gray-600 transition'
+				>
+					{playbackRate}x
+				</button>
+				<Mic size={12} className='text-green-primary' />
+			</div>
 		</div>
 	);
 };

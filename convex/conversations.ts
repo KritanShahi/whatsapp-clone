@@ -70,16 +70,30 @@ export const getMyConversations = query({
 
 		const conversationsWithDetails = await Promise.all(
 			myConversations.map(async (conversation) => {
-				let userDetails = {};
+				let userDetails: {
+					name?: string;
+					email?: string;
+					image?: string;
+					tokenIdentifier?: string;
+					isOnline?: boolean;
+				} = {};
 
 				if (!conversation.isGroup) {
 					const otherUserId = conversation.participants.find((id) => id !== user._id);
 					const userProfile = await ctx.db
 						.query("users")
 						.filter((q) => q.eq(q.field("_id"), otherUserId))
-						.take(1);
+						.first();
 
-					userDetails = userProfile[0];
+					if (userProfile) {
+						userDetails = {
+							name: userProfile.name,
+							email: userProfile.email,
+							image: userProfile.image,
+							tokenIdentifier: userProfile.tokenIdentifier,
+							isOnline: userProfile.isOnline,
+						};
+					}
 				}
 
 				const lastMessage = await ctx.db
